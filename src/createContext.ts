@@ -24,9 +24,12 @@ import {
   Value,
   Variant
 } from './types'
+import * as create from './utils/astCreator'
 import { makeWrapper } from './utils/makeWrapper'
 import * as operators from './utils/operators'
 import { stringify } from './utils/stringify'
+import * as instr from './wgsl/instrCreator'
+import { ReservedParam } from './wgsl/types'
 
 export class LazyBuiltIn {
   func: (...arg0: any) => any
@@ -279,6 +282,18 @@ export const importBuiltins = (context: Context, externalBuiltIns: CustomBuiltIn
     externalBuiltIns.visualiseList(v, context.externalContext)
     return v[0]
   }
+  const play = (fun: Function, length: number) => {
+    context.runtime.agenda_wgsl?.push(instr.playInstr(length, 44100))
+    context.runtime.agenda_wgsl?.push(
+      instr.appInstr(
+        1,
+        create.callExpression(create.identifier('manualCall'), [create.literal(null)])
+      )
+    )
+    context.runtime.agenda_wgsl?.push(instr.popInstr())
+    context.runtime.stash_wgsl?.push(fun)
+    context.runtime.stash_wgsl?.push(new ReservedParam('x'))
+  }
 
   if (context.chapter >= 1) {
     defineBuiltin(context, 'get_time()', misc.get_time)
@@ -377,6 +392,10 @@ export const importBuiltins = (context: Context, externalBuiltIns: CustomBuiltIn
         '__createKernelSource(shape, extern, localNames, output, fun, kernelId)',
         gpu_lib.__createKernelSource
       )
+    }
+
+    if (context.variant === Variant.WGSL) {
+      defineBuiltin(context, 'play(func, length)', play)
     }
   }
 
